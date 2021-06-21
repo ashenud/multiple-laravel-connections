@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'mysql_local'),
+    'default' => env('DB_LOCAL_CONNECTION', 'mysql_local'),
 
     /*
     |--------------------------------------------------------------------------
@@ -81,6 +81,16 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
+        ],
+
+        'mongodb' => [
+            'driver'   => 'mongodb',
+            'host'     => env('DB_MONGO_HOST', 'localhost'),
+            'port'     => env('DB_MONGO_PORT', 27017),
+            'database' => env('DB_MONGO_DATABASE'),
+            'username' => env('DB_MONGO_USERNAME'),
+            'password' => env('DB_MONGO_PASSWORD'),
+            'options'  => []
         ],
 
         'pgsql' => [

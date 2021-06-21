@@ -7,7 +7,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
-class serverDataIntegration extends Command
+class ServerDataIntegration extends Command
 {
     protected $truncate = false;
 

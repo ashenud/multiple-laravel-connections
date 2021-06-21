@@ -31,6 +31,6 @@ class CreateIntegrationSyncTimeTable extends Migration
      */
     public function down()
     {
-        Schema::connection('mysql_server')->dropIfExists('integration_sync_time');
+        Schema::connection('mysql_local')->dropIfExists('integration_sync_time');
     }
 }

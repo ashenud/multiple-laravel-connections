@@ -41,6 +41,6 @@ class CreateCustomersTable extends Migration
      */
     public function down()
     {
-        Schema::connection('mysql_server')->dropIfExists('customers');
+        Schema::connection('mysql_local')->dropIfExists('customers');
     }
 }
