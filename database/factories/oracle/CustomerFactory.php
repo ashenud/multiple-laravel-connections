@@ -4,6 +4,7 @@ namespace Database\Factories\Oracle;
 
 use App\Models\Oracle\Customer;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Carbon;
 
 class CustomerFactory extends Factory
 {
@@ -21,8 +22,6 @@ class CustomerFactory extends Factory
      */
     public function definition()
     {
-        $ceated_at = $this->faker->dateTimeThisDecade($max = 'now', $timezone = null);
-
         return [
             'cus_name' => $this->faker->unique()->company(),        
             'cus_no' => $this->faker->unique()->numberBetween($min = 100000, $max = 999999),
@@ -34,8 +33,8 @@ class CustomerFactory extends Factory
             'cus_email' => $this->faker->unique()->safeEmail(),
             'cus_adddate' => $this->faker->date($format = 'Y-m-d', $max = 'now'),
             'cus_addtime' => $this->faker->time($format = 'H:i:s', $max = 'now'),
-            'created_at' => $ceated_at,
-            'updated_at' => $ceated_at
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now()
         ];
     }
 }

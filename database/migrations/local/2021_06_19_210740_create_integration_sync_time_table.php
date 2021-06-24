@@ -15,9 +15,10 @@ class CreateIntegrationSyncTimeTable extends Migration
     {
         Schema::connection('mysql_local')->create('integration_sync_time', function (Blueprint $table) {
             $table->id();
-            $table->string('server_table_name')->nullable();
-            $table->string('local_table_name')->nullable();
+            $table->string('selected_database')->nullable();
+            $table->string('selected_table')->nullable();
             $table->dateTime('last_sync_time')->nullable();
+            $table->unsignedBigInteger('last_sync_id')->nullable();
             $table->tinyInteger('last_sync_status')->default(1)->comments('1-completed, 0-locked');
             $table->softDeletes();
             $table->timestamps();

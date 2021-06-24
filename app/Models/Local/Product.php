@@ -5,7 +5,7 @@ namespace App\Models\Local;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class IntegrationSyncTime extends Model
+class Product extends Model
 {
     use HasFactory;
 
@@ -14,16 +14,15 @@ class IntegrationSyncTime extends Model
      *
      * @var string
      */
-    protected $connection = 'mysql_local';
+    protected $connection = 'mysql_local';    
 
-    protected $table = 'integration_sync_time';
+    protected $primaryKey = 'pro_id';
 
     protected $fillable = [
-        'selected_database',
-        'selected_table',
-        'last_sync_time',
-        'last_sync_id',
-        'last_sync_status'
+        'pro_name',
+        'pro_no', 
+        'pro_weight',
+        'pro_pack_size',
+        'pro_exp_date'
     ];
-
 }

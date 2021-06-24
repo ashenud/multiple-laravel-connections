@@ -16,13 +16,22 @@ class ServerDataIntegration extends Command
      *
      * @var string
      */
-    protected $signature = 'integration:sync {arg1?} {arg2?}';
+    protected $signature = 'integration:sync {arg1?} {arg2?} {--db=}';
 
     /**
      * Table names in underscore notation
      */
     protected $models = [
-        'customer'
+        'customer',
+        'product'
+    ];
+
+    /**
+     * Databases names in underscore notation
+     */
+    protected $databases = [
+        'local',
+        'server'
     ];
 
     /**
@@ -30,7 +39,7 @@ class ServerDataIntegration extends Command
      *
      * @var string
      */
-    protected $description = 'Syncronizing data from server database table';
+    protected $description = 'Syncronizing data from oracle database table';
 
     /**
      * Create a new command instance.
@@ -49,59 +58,80 @@ class ServerDataIntegration extends Command
      */
     public function handle() {
 
-        $this->info("Starting the integrations.");
-
         $arg1 = $this->argument('arg1');
         $arg2 = $this->argument('arg2');
+        $db = $this->option('db');
+        if($this->validate_signature($db)) {
 
-        $models = [];
+            $this->info("Starting the integrations.");
 
-        if($arg2=='truncate'||$arg1=='truncate'){
-            $this->truncate= true;
+            $models = [];
+            if($arg2=='truncate'||$arg1=='truncate'){
+                $this->truncate= true;
+            }
+
+            if($arg1&&$arg1!='truncate') {
+                $models = explode(',',$arg1);
+            }
+            else {
+                $models = $this->models;
+            }
+
+            foreach ($models as $name) {
+                $this->syncTable($name,$db);
+            }
         }
 
-        if($arg1&&$arg1!='truncate'){
-            $models = explode(',',$arg1);
-        } else {
-            $models = $this->models;
-        }
-
-        foreach ($models as $name) {
-            $this->syncTable($name);
-        }
     }
 
-    protected function syncTable($name){
+    protected function validate_signature($db) {
+
+        if($db == "") {
+            $this->error("Select a database to store oracle data.");
+            return false;
+        }
+        elseif (!in_array($db, $this->databases, TRUE)) {
+            $this->error("Database that you enterd is not exists.");
+            return false;
+        }
+        else {
+            return true;
+        }
+        
+    }
+
+    protected function syncTable($name,$db){
         $time = date('Y-m-d H:i:s.u');
-        $this->info("Syncronizing table ".$name." at $time ");
+        $this->warn("Syncronizing table ".$name." to ".$db." database at $time ");
 
         $model_class = ucfirst(strtolower($name));
+        $database = ucfirst(strtolower($db));
 
-        $local_model_path = 'App\Models\Local\\'.$model_class;
-        $server_model_path = 'App\Models\Server\\'.$model_class;
+        $selected_model_path = 'App\Models\\'.$database.'\\'.$model_class;
+        $oracle_model_path = 'App\Models\Oracle\\'.$model_class;
 
-        $local_model = new $local_model_path;
-        $server_model = new $server_model_path;
+        $selected_model = new $selected_model_path;
+        $oracle_model = new $oracle_model_path;
 
         if( !$this->truncate ) {
-            $this->syncChanged($local_model,$server_model,$name);
+            $this->syncChanged($selected_model,$oracle_model,$name,$db);
         }else if($this->truncate){
             $this->warn("Truncating table $name");
-            $this->truncateAndInsert($local_model,$server_model,$name);
+            $this->truncateAndInsert($selected_model,$oracle_model,$name,$db);
         }
         $this->info("Finished syncronizing table ".$name." at $time ");
     }    
 
-    protected function syncChanged($local_model,$server_model,$name) {
+    protected function syncChanged($selected_model,$oracle_model,$name,$db) {
 
-        $primaryKey = $server_model->getKeyName(); // Getting primary key column name
+        $primaryKey = $oracle_model->getKeyName(); // Getting primary key column name
         $time = time();
 
         // Getting last timestamp
-        $check_sync_time = IntegrationSyncTime::where('local_table_name',$name)->first();
+        $check_sync_time = IntegrationSyncTime::where('selected_table',$name)->where('selected_database',$db)->first();
 
         if (!$check_sync_time) {
-            $query = $server_model::query();
+            $query = $oracle_model;
         } else {
 
             if(!$check_sync_time->last_sync_status){
@@ -110,13 +140,18 @@ class ServerDataIntegration extends Command
             }
             $check_sync_time->last_sync_status = 0;
             $check_sync_time->save();
-            $query = $server_model;
+
+            if($oracle_model->dateFlag && $oracle_model->dateFlag != 'NULL'){
+                $query = $oracle_model::where($oracle_model->dateFlag, '>', $check_sync_time->last_sync_time);
+            } else {
+                $query = $oracle_model;
+            }
         }
 
         try {
 
             $results = $query->get();
-            $this->info("Fetched ".$results->count()." rows from server connection.");
+            $this->info("Fetched ".$results->count()." rows from oracle connection.");
 
             DB::beginTransaction();
 
@@ -128,30 +163,30 @@ class ServerDataIntegration extends Command
                 $updated = 0;
                 foreach ($results as $key=> $row) {
 
-                    $exists = $local_model::where($primaryKey, $row->{$primaryKey})->latest()->first();
+                    $exists = $selected_model::where($primaryKey, $row->{$primaryKey})->latest()->first();
                     $data = [];
 
-                    foreach($local_model->getFillable() as $columnName){
+                    foreach($selected_model->getFillable() as $columnName){
                         $data[$columnName] = $row->{$columnName};
                     }
 
                     if ($exists) {
                         $updated++;
-                        if($server_model->hasCompositePrimary){
-                            $primary = $server_model->getKeyName();
+                        if($oracle_model->hasCompositePrimary){
+                            $primary = $oracle_model->getKeyName();
 
                             $where = [];
                             foreach($primary as $column){
                                 $where[$column] = $row->{$column};
                             }
-                            $exists = $local_model::where($where)->update($data);
+                            $exists = $selected_model::where($where)->update($data);
                         }
                         else{
                             $exists->update($data);
                         }
 
                     } else {
-                        $exists = $local_model::create($data);
+                        $exists = $selected_model::create($data);
                     }
 
                     $progress_bar->advance();
@@ -171,23 +206,23 @@ class ServerDataIntegration extends Command
         }
 
         $last_updated = IntegrationSyncTime::firstOrNew([
-            'local_table_name'=> $name
+            'selected_table'=> $name,
+            'selected_database'=> $db
         ]);
 
         $last_updated->last_sync_time = date('Y-m-d H:i:s',$time);
         $last_updated->last_sync_status = 1;
         $last_updated->save();
     }
-    
 
-    protected function truncateAndInsert($local_model,$server_model,$name){
-        $local_model::truncate();
+    protected function truncateAndInsert($selected_model,$oracle_model,$name){
+        $selected_model::truncate();
 
         $this->warn("Truncated table $name");
 
-        $results = $server_model::all();
+        $results = $oracle_model::all();
 
-        $this->info("Fetched ".$results->count()." rows from server connection.");
+        $this->info("Fetched ".$results->count()." rows from oracle connection.");
 
         if (!$results->isEmpty()) {
 
@@ -198,11 +233,11 @@ class ServerDataIntegration extends Command
 
                 $data = [];
 
-                foreach($local_model->getFillable() as $name){
+                foreach($selected_model->getFillable() as $name){
                     $data[$name] = $row->{$name};
                 }
 
-                $exists = $local_model::create($data);
+                $exists = $selected_model::create($data);
                 
                 $progress_bar->advance();
             }

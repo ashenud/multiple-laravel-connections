@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateCustomersTable extends Migration
+class CreateOracleCustomersTable extends Migration
 {
     /**
      * Run the migrations.
@@ -13,7 +13,7 @@ class CreateCustomersTable extends Migration
      */
     public function up()
     {
-        Schema::connection('oracle')->create('customers', function (Blueprint $table) {
+        Schema::connection('oracle')->create('oracle_customers', function (Blueprint $table) {
             $table->bigIncrements('cus_id');
             $table->string('cus_name')->nullable();
             $table->integer('cus_no')->nullable();
@@ -40,6 +40,6 @@ class CreateCustomersTable extends Migration
      */
     public function down()
     {
-        Schema::connection('oracle')->dropIfExists('customers');
+        Schema::connection('oracle')->dropIfExists('oracle_customers');
     }
 }
