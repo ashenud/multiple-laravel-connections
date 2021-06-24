@@ -30,7 +30,6 @@ App\Models\Mongo\Customer::factory()->count(1000)->create()
 DB::connection('mongodb')->collection('customers')->get();
 DB::connection('oracle')->table('oracle_customers')->truncate();
 
-php artisan integration:sync customer truncate
-
+php artisan integration:sync product,customer truncate --db=local
 composer dump-autoload    
 

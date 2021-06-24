@@ -16,7 +16,7 @@ class ServerDataIntegration extends Command
      *
      * @var string
      */
-    protected $signature = 'integration:sync {arg1?} {arg2?} {--db=}';
+    protected $signature = 'integration:sync {models?} {truncate?} {--db=}';
 
     /**
      * Table names in underscore notation
@@ -58,19 +58,19 @@ class ServerDataIntegration extends Command
      */
     public function handle() {
 
-        $arg1 = $this->argument('arg1');
-        $arg2 = $this->argument('arg2');
+        $arg1 = $this->argument('models');
+        $arg2 = $this->argument('truncate');
         $db = $this->option('db');
-        if($this->validate_signature($db)) {
+        if($this->validate_signature($arg1,$arg2,$db)) {
 
             $this->info("Starting the integrations.");
 
             $models = [];
-            if($arg2=='truncate'||$arg1=='truncate'){
+            if($arg1 == 'truncate' || $arg2 == 'truncate'){
                 $this->truncate= true;
             }
 
-            if($arg1&&$arg1!='truncate') {
+            if( isset($arg1) && $arg1 != 'truncate' ) {
                 $models = explode(',',$arg1);
             }
             else {
@@ -84,25 +84,55 @@ class ServerDataIntegration extends Command
 
     }
 
-    protected function validate_signature($db) {
+    protected function validate_signature($arg1,$arg2,$db) {
 
+        $valid = true;
+        if( isset($arg1) && $arg1 != 'truncate' ) {
+            $enterd_models = explode(',',$arg1);
+            $diff = array_diff($enterd_models,$this->models);
+            if(count($diff) > 0) {
+                $this->newLine();
+                $this->error("                                                   ");
+                $this->error("One or more table(s) that you enterd is not exists.");
+                $this->newLine();
+                $valid = false;
+                return false;
+            }
+        }
+
+        if(isset($arg2) && $arg2 != 'truncate') {
+            $this->newLine();
+            $this->error("                              ");
+            $this->error("Argument two must be truncate.");
+            $this->newLine();
+            $valid = false;
+            return false;
+        }
+        
         if($db == "") {
+            $this->newLine();
+            $this->error("                                       ");
             $this->error("Select a database to store oracle data.");
+            $this->newLine();
+            $valid = false;
             return false;
         }
         elseif (!in_array($db, $this->databases, TRUE)) {
+            $this->newLine();
+            $this->error("                                       ");
             $this->error("Database that you enterd is not exists.");
+            $this->newLine();
+            $valid = false;
             return false;
         }
-        else {
-            return true;
-        }
-        
+
+        return $valid;
+
     }
 
     protected function syncTable($name,$db){
-        $time = date('Y-m-d H:i:s.u');
-        $this->warn("Syncronizing table ".$name." to ".$db." database at $time ");
+        $time = date('Y-m-d H:i:s');
+        $this->warn("Syncronizing table ".$name." to ".$db." database at $time");
 
         $model_class = ucfirst(strtolower($name));
         $database = ucfirst(strtolower($db));
@@ -119,7 +149,7 @@ class ServerDataIntegration extends Command
             $this->warn("Truncating table $name");
             $this->truncateAndInsert($selected_model,$oracle_model,$name,$db);
         }
-        $this->info("Finished syncronizing table ".$name." at $time ");
+        $this->info("Finished syncronizing table ".$name." at ".date('Y-m-d H:i:s'));
     }    
 
     protected function syncChanged($selected_model,$oracle_model,$name,$db) {
@@ -158,7 +188,7 @@ class ServerDataIntegration extends Command
             if (!$results->isEmpty()) {
 
                 $progress_bar = $this->output->createProgressBar($results->count());
-                $progress_bar->setFormat('%current%/%max% [<fg=magenta>%bar%</>] %percent:3s%% %elapsed:6s%/%estimated:-6s%');
+                $progress_bar->setFormat('<fg=blue;bg=black>%current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s%</>');
 
                 $updated = 0;
                 foreach ($results as $key=> $row) {
@@ -215,10 +245,11 @@ class ServerDataIntegration extends Command
         $last_updated->save();
     }
 
-    protected function truncateAndInsert($selected_model,$oracle_model,$name){
+    protected function truncateAndInsert($selected_model,$oracle_model,$name,$db){
+        $time = time();
         $selected_model::truncate();
 
-        $this->warn("Truncated table $name");
+        $this->warn("Truncated table $name in $db database");
 
         $results = $oracle_model::all();
 
@@ -227,17 +258,17 @@ class ServerDataIntegration extends Command
         if (!$results->isEmpty()) {
 
             $progress_bar = $this->output->createProgressBar($results->count());
-            $progress_bar->setFormat('%current%/%max% [<fg=magenta>%bar%</>] %percent:3s%% %elapsed:6s%/%estimated:-6s%');
+            $progress_bar->setFormat('<fg=blue;bg=black>%current%/%max% [%bar%] %percent:3s%% %elapsed:6s%/%estimated:-6s%</>');
 
             foreach ($results as $key=> $row) {
 
                 $data = [];
 
-                foreach($selected_model->getFillable() as $name){
-                    $data[$name] = $row->{$name};
+                foreach($selected_model->getFillable() as $columnName){
+                    $data[$columnName] = $row->{$columnName};
                 }
 
-                $exists = $selected_model::create($data);
+                $selected_model::create($data);
                 
                 $progress_bar->advance();
             }
@@ -247,6 +278,16 @@ class ServerDataIntegration extends Command
             $this->info("Changes affected to ".($key+1)." row(s).");
 
         }
+
+        $last_updated = IntegrationSyncTime::firstOrNew([
+            'selected_table'=> $name,
+            'selected_database'=> $db
+        ]);
+
+        $last_updated->last_sync_time = date('Y-m-d H:i:s',$time);
+        $last_updated->last_sync_status = 1;
+        $last_updated->save();
+
     }
 
 }
