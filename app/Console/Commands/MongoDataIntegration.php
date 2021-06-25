@@ -7,8 +7,8 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
-class OracleDataIntegration extends Command
-{
+class MongoDataIntegration extends Command {
+
     protected $truncate = false;
 
     /**
@@ -16,14 +16,13 @@ class OracleDataIntegration extends Command
      *
      * @var string
      */
-    protected $signature = 'integration:sync {models?} {truncate?} {--db=}';
+    protected $signature = 'integration:mongo {models?} {truncate?} {--db=}';
 
     /**
      * Table names in underscore notation
      */
     protected $models = [
-        'customer',
-        'product'
+        'invoice'
     ];
 
     /**
@@ -39,7 +38,7 @@ class OracleDataIntegration extends Command
      *
      * @var string
      */
-    protected $description = 'Syncronizing data from oracle database table to local and server database';
+    protected $description = 'Syncronizing data from local and sever database tables to mongodb';
 
     /**
      * Create a new command instance.
@@ -111,8 +110,8 @@ class OracleDataIntegration extends Command
         
         if($db == "") {
             $this->newLine();
-            $this->error("                                       ");
-            $this->error("Select a database to store oracle data.");
+            $this->error("                              ");
+            $this->error("Select a database to get data.");
             $this->newLine();
             $valid = false;
             return false;
@@ -132,36 +131,38 @@ class OracleDataIntegration extends Command
 
     protected function syncTable($name,$db){
         $time = date('Y-m-d H:i:s');
-        $this->warn("Syncronizing table ".$name." to ".$db." database at $time");
+        $this->warn("Syncronizing table ".$name." to mongodb from ".$db." database at $time");
 
         $model_class = ucfirst(strtolower($name));
         $database = ucfirst(strtolower($db));
 
         $selected_model_path = 'App\Models\\'.$database.'\\'.$model_class;
-        $oracle_model_path = 'App\Models\Oracle\\'.$model_class;
+        $mongo_model_path = 'App\Models\Mongo\\'.$database.$model_class;
 
         $selected_model = new $selected_model_path;
-        $oracle_model = new $oracle_model_path;
+        $mongo_model = new $mongo_model_path;
 
         if( !$this->truncate ) {
-            $this->syncChanged($selected_model,$oracle_model,$name,$db);
+            $this->syncChanged($selected_model,$mongo_model,$name,$db);
         }else if($this->truncate){
             $this->warn("Truncating table $name");
-            $this->truncateAndInsert($selected_model,$oracle_model,$name,$db);
+            $this->truncateAndInsert($selected_model,$mongo_model,$name,$db);
         }
         $this->info("Finished syncronizing table ".$name." at ".date('Y-m-d H:i:s'));
     }    
 
-    protected function syncChanged($selected_model,$oracle_model,$name,$db) {
+    protected function syncChanged($selected_model,$mongo_model,$name,$db) {
 
-        $primaryKey = $oracle_model->getKeyName(); // Getting primary key column name
+        $primaryKey = $selected_model->getKeyName(); // Getting primary key column name
         $time = time();
 
+        $selected_table = $db."_".$name;
+
         // Getting last timestamp
-        $check_sync_time = IntegrationSyncTime::where('selected_table',$name)->where('selected_database',$db)->first();
+        $check_sync_time = IntegrationSyncTime::where('selected_table',$selected_table)->where('selected_database',$db)->first();
 
         if (!$check_sync_time) {
-            $query = $oracle_model;
+            $query = $selected_model;
         } else {
 
             if(!$check_sync_time->last_sync_status){
@@ -171,17 +172,17 @@ class OracleDataIntegration extends Command
             $check_sync_time->last_sync_status = 0;
             $check_sync_time->save();
 
-            if($oracle_model->dateFlag && $oracle_model->dateFlag != 'NULL'){
-                $query = $oracle_model::where($oracle_model->dateFlag, '>', $check_sync_time->last_sync_time);
+            if($selected_model->dateFlag && $selected_model->dateFlag != 'NULL'){
+                $query = $selected_model::where($selected_model->dateFlag, '>', $check_sync_time->last_sync_time);
             } else {
-                $query = $oracle_model;
+                $query = $selected_model;
             }
         }
 
         try {
 
             $results = $query->get();
-            $this->info("Fetched ".$results->count()." rows from oracle connection.");
+            $this->info("Fetched ".$results->count()." rows from ".$db." connection.");
 
             DB::beginTransaction();
 
@@ -193,30 +194,30 @@ class OracleDataIntegration extends Command
                 $updated = 0;
                 foreach ($results as $key=> $row) {
 
-                    $exists = $selected_model::where($primaryKey, $row->{$primaryKey})->latest()->first();
+                    $exists = $mongo_model::where($primaryKey, $row->{$primaryKey})->latest()->first();
                     $data = [];
 
-                    foreach($selected_model->getFillable() as $columnName){
+                    foreach($mongo_model->getFillable() as $columnName){
                         $data[$columnName] = $row->{$columnName};
                     }
 
                     if ($exists) {
                         $updated++;
-                        if($oracle_model->hasCompositePrimary){
-                            $primary = $oracle_model->getKeyName();
+                        if($selected_model->hasCompositePrimary){
+                            $primary = $selected_model->getKeyName();
 
                             $where = [];
                             foreach($primary as $column){
                                 $where[$column] = $row->{$column};
                             }
-                            $exists = $selected_model::where($where)->update($data);
+                            $exists = $mongo_model::where($where)->update($data);
                         }
                         else{
                             $exists->update($data);
                         }
 
                     } else {
-                        $exists = $selected_model::create($data);
+                        $exists = $mongo_model::create($data);
                     }
 
                     $progress_bar->advance();
@@ -231,12 +232,12 @@ class OracleDataIntegration extends Command
 
         } catch (\Exception $exception) {
             DB::rollback();
-            $this->error("Failed to write to $name table. Error:- ".$exception->__toString());
+            $this->error("Failed to write to $selected_table table. Error:- ".$exception->__toString());
             Storage::put('/public/errors/integration/'.date("Y-m-d").'/'.$name.'.txt',date("H:i:s")."\n".$exception->__toString()."\n\n");
         }
 
         $last_updated = IntegrationSyncTime::firstOrNew([
-            'selected_table'=> $name,
+            'selected_table'=> $selected_table,
             'selected_database'=> $db
         ]);
 
@@ -245,15 +246,17 @@ class OracleDataIntegration extends Command
         $last_updated->save();
     }
 
-    protected function truncateAndInsert($selected_model,$oracle_model,$name,$db){
+    protected function truncateAndInsert($selected_model,$mongo_model,$name,$db){
         $time = time();
-        $selected_model::truncate();
+        $selected_table = $db."_".$name;
 
-        $this->warn("Truncated table $name in $db database");
+        $mongo_model::truncate();
 
-        $results = $oracle_model::all();
+        $this->warn("Truncated table $selected_table in mongodb");
 
-        $this->info("Fetched ".$results->count()." rows from oracle connection.");
+        $results = $selected_model::all();
+
+        $this->info("Fetched ".$results->count()." rows from ".$db." connection.");
 
         if (!$results->isEmpty()) {
 
@@ -264,11 +267,11 @@ class OracleDataIntegration extends Command
 
                 $data = [];
 
-                foreach($selected_model->getFillable() as $columnName){
+                foreach($mongo_model->getFillable() as $columnName){
                     $data[$columnName] = $row->{$columnName};
                 }
 
-                $selected_model::create($data);
+                $mongo_model::create($data);
                 
                 $progress_bar->advance();
             }
@@ -280,7 +283,7 @@ class OracleDataIntegration extends Command
         }
 
         $last_updated = IntegrationSyncTime::firstOrNew([
-            'selected_table'=> $name,
+            'selected_table'=> $selected_table,
             'selected_database'=> $db
         ]);
 
@@ -289,5 +292,4 @@ class OracleDataIntegration extends Command
         $last_updated->save();
 
     }
-
 }

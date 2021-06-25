@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Jenssegers\Mongodb\Eloquent\SoftDeletes;
 use Jenssegers\Mongodb\Eloquent\Model;
 
-class Customer extends Model
+class ServerInvoice extends Model
 {
     use HasFactory, SoftDeletes;
     
@@ -17,23 +17,19 @@ class Customer extends Model
      */
     protected $connection = 'mongodb';
 
-    protected $collection = 'customers';
+    protected $collection = 'server_invoices';
 
     protected $deleted_at = ['deleted_at'];
     
     public $dateFlag = 'updated_at';
 
     protected $fillable = [
-        'cus_id',
-        'cus_name',
-        'cus_no', 
-        'cus_add1',
-        'cus_add2',
-        'cus_add3',
-        'cus_tel',
-        'cus_fax',
-        'cus_email',
-        'cus_adddate',
-        'cus_addtime'
+        'inv_id', 
+        'inv_no', 
+        'inv_date',
+        'inv_time',
+        'inv_user',
+        'inv_amount',
+        'inv_discount'
     ];
 }
