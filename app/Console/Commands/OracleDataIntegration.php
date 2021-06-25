@@ -16,7 +16,7 @@ class OracleDataIntegration extends Command
      *
      * @var string
      */
-    protected $signature = 'integration:sync {models?} {truncate?} {--db=}';
+    protected $signature = 'integration:oracle {models?} {truncate?} {--db=}';
 
     /**
      * Table names in underscore notation
