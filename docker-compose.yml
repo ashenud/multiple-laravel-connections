@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+  mlr-api:
+    build: ./docker/php-fpm
+    image: mlr-php-7.3
+    container_name: mlr-api
+    restart: unless-stopped
+    volumes:
+      - .:/var/www
+    command: ["/bin/bash", "-c", "/usr/local/bin/init.sh"]
+    networks:
+      - network-link
+
+  mlr-mysql-local:
+    image: mysql:5.7
+    container_name: ${DB_LOCAL_HOST}
+    restart: unless-stopped
+    ports:
+      - "3366:3306"
+    environment:
+      MYSQL_DATABASE: '${DB_LOCAL_DATABASE}'
+      MYSQL_USER: '${DB_LOCAL_USERNAME}'
+      MYSQL_PASSWORD: '${DB_LOCAL_PASSWORD}'
+      MYSQL_ROOT_PASSWORD: '${DB_LOCAL_ROOT_PASSWORD}'
+    networks:
+      - network-link
+    volumes:
+      - mysql-local-database-data:/var/lib/mysql
+
+  mlr-mysql-server:
+    image: mysql:5.7
+    container_name: ${DB_SERVER_HOST}
+    restart: unless-stopped
+    ports:
+      - "3666:3306"
+    environment:
+      MYSQL_DATABASE: '${DB_SERVER_DATABASE}'
+      MYSQL_USER: '${DB_SERVER_USERNAME}'
+      MYSQL_PASSWORD: '${DB_SERVER_PASSWORD}'
+      MYSQL_ROOT_PASSWORD: '${DB_SERVER_ROOT_PASSWORD}'
+    networks:
+      - network-link
+    volumes:
+      - mysql-server-database-data:/var/lib/mysql
+
+networks:
+  network-link:
+    driver: bridge
+
+volumes:
+  mysql-local-database-data:
+    # noinspection ComposeUnknownKeys
+    name: mlr-mysql-local-database
+  mysql-server-database-data:
+    # noinspection ComposeUnknownKeys
+    name: mlr-mysql-server-database
