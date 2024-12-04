@@ -1,18 +1,21 @@
-version: '3'
-
 services:
-  mlr-api:
+  mlc-api:
     build: ./docker/php-fpm
-    image: mlr-php-7.3
-    container_name: mlr-api
+    image: mlc-php-7.3
+    container_name: mlc-api
     restart: unless-stopped
     volumes:
       - .:/var/www
     command: ["/bin/bash", "-c", "/usr/local/bin/init.sh"]
     networks:
-      - network-link
+      - mlc-network-link
+    depends_on:
+      - mlc-mysql-local
+      - mlc-mysql-server
+      - mlc-mongodb
+      - mlc-oracle
 
-  mlr-mysql-local:
+  mlc-mysql-local:
     image: mysql:5.7
     container_name: ${DB_LOCAL_HOST}
     restart: unless-stopped
@@ -24,11 +27,11 @@ services:
       MYSQL_PASSWORD: '${DB_LOCAL_PASSWORD}'
       MYSQL_ROOT_PASSWORD: '${DB_LOCAL_ROOT_PASSWORD}'
     networks:
-      - network-link
+      - mlc-network-link
     volumes:
       - mysql-local-database-data:/var/lib/mysql
 
-  mlr-mysql-server:
+  mlc-mysql-server:
     image: mysql:5.7
     container_name: ${DB_SERVER_HOST}
     restart: unless-stopped
@@ -40,18 +43,55 @@ services:
       MYSQL_PASSWORD: '${DB_SERVER_PASSWORD}'
       MYSQL_ROOT_PASSWORD: '${DB_SERVER_ROOT_PASSWORD}'
     networks:
-      - network-link
+      - mlc-network-link
     volumes:
       - mysql-server-database-data:/var/lib/mysql
 
+  mlc-mongodb:
+    image: mongo:8
+    container_name: ${DB_MONGO_HOST}
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: '${DB_MONGO_DATABASE}'
+      MONGO_INITDB_ROOT_USERNAME: '${DB_MONGO_USERNAME}'
+      MONGO_INITDB_ROOT_PASSWORD: '${DB_MONGO_PASSWORD}'
+    networks:
+      - mlc-network-link
+    volumes:
+      - mongodb-data:/data/db
+
+  mlc-oracle:
+    image: container-registry.oracle.com/database/free:23.5.0.0
+    container_name: ${DB_ORACLE_HOST}
+    restart: unless-stopped
+    ports:
+      - "3333:1521"
+    environment:
+      - ORACLE_PASSWORD='${DB_ORACLE_PASSWORD}'
+      - ORACLE_USERNAME='${DB_ORACLE_USERNAME}'
+      - ORACLE_DATABASE='${DB_ORACLE_DATABASE}'
+    networks:
+      - mlc-network-link
+    volumes:
+      - ./docker/oracle/init.sql:/tmp/init.sql
+      - oracle-data:/opt/oracle/oradata
+      - oracle-backup:/opt/oracle/backup
+
 networks:
-  network-link:
+  mlc-network-link:
     driver: bridge
+    name: mlc-network-link
 
 volumes:
   mysql-local-database-data:
-    # noinspection ComposeUnknownKeys
-    name: mlr-mysql-local-database
+    name: mlc-mysql-local-database
   mysql-server-database-data:
-    # noinspection ComposeUnknownKeys
-    name: mlr-mysql-server-database
+    name: mlc-mysql-server-database
+  mongodb-data:
+    name: mlc-mongodb-data
+  oracle-data:
+    name: mlc-oracle-data
+  oracle-backup:
+    name: mlc-oracle-backup
