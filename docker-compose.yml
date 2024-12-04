@@ -1,12 +1,12 @@
 services:
-  mlc-api:
+  mlc-backend:
     build: ./docker/php-fpm
     image: mlc-php-7.3
-    container_name: mlc-api
+    container_name: mlc-backend
     restart: unless-stopped
     volumes:
-      - .:/var/www
-    command: ["/bin/bash", "-c", "/usr/local/bin/init.sh"]
+      - .:/var/www/html
+    # command: ["/bin/bash", "-c", "/usr/local/bin/init.sh"]
     networks:
       - mlc-network-link
     depends_on:
