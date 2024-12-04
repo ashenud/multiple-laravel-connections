@@ -37,7 +37,10 @@ RUN echo /opt/oracle/instantclient/ > /etc/ld.so.conf.d/oracle-insantclient.conf
 RUN ldconfig
 
 # Install MongoDB extension
-RUN pecl install mongodb \
+RUN apt-get update && apt-get install -y \
+    libssl-dev \
+    pkg-config \
+    && pecl install mongodb \
     && docker-php-ext-enable mongodb
 
 
