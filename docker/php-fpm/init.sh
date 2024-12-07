@@ -11,3 +11,6 @@ composer update
 
 # Run database migrations
 php artisan migrate
+
+# Start PHP-FPM
+php-fpm
