@@ -1,3 +1,5 @@
+# TODO: This file is currently unused. Update it to create users based on `.env` configurations.
+# Reference: https://github.com/ashenud/multiple-laravel-connections/issues/3
 FROM container-registry.oracle.com/database/free:23.5.0.0
 
 # Set environment variables for the password and database details

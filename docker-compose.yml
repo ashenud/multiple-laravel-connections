@@ -68,6 +68,9 @@ services:
     restart: unless-stopped
     ports:
       - "3333:1521"
+    # TODO: These environment variables are not currently in use. They need to be utilized for accessing users in the future.
+    # Currently, hardcoded user is created using a query in the `./docker/oracle/init.sql` file.
+    # Reference: https://github.com/ashenud/multiple-laravel-connections/issues/3
     environment:
       - ORACLE_PASSWORD='${DB_ORACLE_PASSWORD}'
       - ORACLE_USERNAME='${DB_ORACLE_USERNAME}'
