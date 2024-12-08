@@ -1,4 +1,15 @@
+# ------------------------------------------------------------------------------
+# Dockerfile for PHP 8.3.8-FPM with Oracle and MongoDB extensions
+# Description: This Dockerfile sets up a PHP-FPM container with necessary 
+# system dependencies, Oracle Instant Client, MongoDB extension, and custom 
+# configurations for use in a Laravel application.
+# Author: Ashen Udithamal (https://www.linkedin.com/in/ashenud/)
+# ------------------------------------------------------------------------------
+
 FROM php:8.3.8-fpm
+
+LABEL MAINTAINER="Ashen Udithamal <https://www.linkedin.com/in/ashenud/>"
+LABEL DESCRIPTION="Dockerfile for PHP 8.3.8-FPM with Oracle and MongoDB extensions"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
