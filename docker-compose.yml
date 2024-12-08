@@ -1,0 +1,100 @@
+services:
+  mlc-backend:
+    build: ./docker/php-fpm
+    image: mlc-php:8.3.8-fpm
+    container_name: mlc_backend
+    restart: unless-stopped
+    volumes:
+      - .:/var/www/html
+    command: ["/bin/bash", "-c", "/usr/local/bin/init.sh"]
+    networks:
+      - mlc-network-link
+    depends_on:
+      - mlc-mysql-local
+      - mlc-mysql-server
+      - mlc-mongodb
+      - mlc-oracle
+
+  mlc-mysql-local:
+    image: mysql:5.7
+    container_name: ${DB_LOCAL_HOST}
+    restart: unless-stopped
+    ports:
+      - "3366:3306"
+    environment:
+      MYSQL_DATABASE: '${DB_LOCAL_DATABASE}'
+      MYSQL_USER: '${DB_LOCAL_USERNAME}'
+      MYSQL_PASSWORD: '${DB_LOCAL_PASSWORD}'
+      MYSQL_ROOT_PASSWORD: '${DB_LOCAL_ROOT_PASSWORD}'
+    networks:
+      - mlc-network-link
+    volumes:
+      - mysql-local-database-data:/var/lib/mysql
+
+  mlc-mysql-server:
+    image: mysql:5.7
+    container_name: ${DB_SERVER_HOST}
+    restart: unless-stopped
+    ports:
+      - "3666:3306"
+    environment:
+      MYSQL_DATABASE: '${DB_SERVER_DATABASE}'
+      MYSQL_USER: '${DB_SERVER_USERNAME}'
+      MYSQL_PASSWORD: '${DB_SERVER_PASSWORD}'
+      MYSQL_ROOT_PASSWORD: '${DB_SERVER_ROOT_PASSWORD}'
+    networks:
+      - mlc-network-link
+    volumes:
+      - mysql-server-database-data:/var/lib/mysql
+
+  mlc-mongodb:
+    image: mongo:8
+    container_name: ${DB_MONGO_HOST}
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: '${DB_MONGO_DATABASE}'
+      MONGO_INITDB_ROOT_USERNAME: '${DB_MONGO_USERNAME}'
+      MONGO_INITDB_ROOT_PASSWORD: '${DB_MONGO_PASSWORD}'
+    networks:
+      - mlc-network-link
+    volumes:
+      - mongodb-data:/data/db
+
+  mlc-oracle:
+    image: container-registry.oracle.com/database/free:23.5.0.0
+    container_name: ${DB_ORACLE_HOST}
+    restart: unless-stopped
+    ports:
+      - "3333:1521"
+    # TODO: These environment variables are not currently in use. They need to be utilized for create accessing users in the future.
+    # Currently, hardcoded user is created using a query in the `./docker/oracle/init.sql` file.
+    # Reference: https://github.com/ashenud/multiple-laravel-connections/issues/3
+    environment:
+      - ORACLE_PASSWORD='${DB_ORACLE_PASSWORD}'
+      - ORACLE_USERNAME='${DB_ORACLE_USERNAME}'
+      - ORACLE_SERVICE_NAME='${DB_ORACLE_SERVICE_NAME}'
+    networks:
+      - mlc-network-link
+    volumes:
+      - ./docker/oracle/init.sql:/tmp/init.sql
+      - oracle-data:/opt/oracle/oradata
+      - oracle-backup:/opt/oracle/backup
+
+networks:
+  mlc-network-link:
+    driver: bridge
+    name: mlc-network-link
+
+volumes:
+  mysql-local-database-data:
+    name: mlc-mysql-local-database
+  mysql-server-database-data:
+    name: mlc-mysql-server-database
+  mongodb-data:
+    name: mlc-mongodb-data
+  oracle-data:
+    name: mlc-oracle-data
+  oracle-backup:
+    name: mlc-oracle-backup
